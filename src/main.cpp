@@ -8,6 +8,8 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 #include "json.hpp"
+#include "matplotlibcpp.h"
+namespace plt = matplotlibcpp;
 
 // for convenience
 using json = nlohmann::json;
@@ -16,6 +18,7 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& py, double& psi);
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -92,14 +95,36 @@ int main() {
           double psi = j[1]["psi"];
           double v = j[1]["speed"];
 
+          toCarCoord(ptsx, ptsy, px, py, psi);
+
+          //plt::plot(ptsx, ptsy);
+          //plt::show();
+
+          int vsize = ptsx.size();
+          Eigen::VectorXd vptsx(vsize);
+          Eigen::VectorXd vptsy(vsize);
+          for(int i = 0; i < vsize; ++i) {
+            vptsx[i] = ptsx[i];
+            vptsy[i] = ptsy[i];
+          }
+
+          auto coeffs = polyfit(vptsx, vptsy, 3);
+          double cte = py - polyeval(coeffs, px);
+          double epsi = psi - atan(2. * coeffs[2] + coeffs[1]);
+          Eigen::VectorXd state(6);
+          state << px, py, psi, v, cte, epsi;
+
+          auto vars = mpc.Solve(state, coeffs);
+
           /*
           * TODO: Calculate steering angle and throttle using MPC.
           *
           * Both are in between [-1, 1].
           *
           */
-          double steer_value;
-          double throttle_value;
+          double steer_value = vars[6];
+          double throttle_value = vars[7];
+
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
@@ -110,6 +135,12 @@ int main() {
           //Display the MPC predicted trajectory 
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
+          for(int i = 0; i < vsize; ++i) {
+            if(ptsx[i] > 2.) {
+              mpc_x_vals.push_back(ptsx[i]);
+              mpc_y_vals.push_back(ptsy[i]);
+            }
+          }
 
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
@@ -182,4 +213,23 @@ int main() {
     return -1;
   }
   h.run();
+}
+
+void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& py, double& psi) {
+  vector<double> carx;
+  vector<double> cary;
+
+  int n = ptsx.size();
+  for(int i = 0; i < n; ++i) {
+    double x = cos(-psi) * (ptsx[i] - px) - sin(-psi) * (ptsy[i] - py);
+    double y = sin(-psi) * (ptsx[i] - px) + cos(-psi) * (ptsy[i] - py);
+    carx.push_back(x);
+    cary.push_back(y);
+  }
+
+  ptsx = carx;
+  ptsy = cary;
+  px = 0.;
+  py = 0.;
+  psi = 0.;
 }
