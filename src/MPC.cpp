@@ -5,10 +5,28 @@
 
 using CppAD::AD;
 
+// Evaluate a polynomial.
+double polyeval(Eigen::VectorXd coeffs, double x) {
+  double result = 0.0;
+  for (int i = 0; i < coeffs.size(); i++) {
+    result += coeffs[i] * pow(x, i);
+  }
+  return result;
+}
+
+// Evaluate a derivative.
+double polyderiv(Eigen::VectorXd coeffs, double x) {
+  double result = 0.0;
+  for (int i = 1; i < coeffs.size(); i++) {
+    result += i * coeffs[i] * pow(x, i - 1);
+  }
+  return result;
+}
+
 // TODO: Set the timestep length and duration
 //size_t N = 10;
 //double dt = 0.1;
-size_t N = 5;
+size_t N = 10;
 double dt = 0.1;
 
 // This value assumes the model presented in the classroom is used.
@@ -54,16 +72,16 @@ class FG_eval {
       AD<double> cte = vars[cte_start + t];
       AD<double> epsi = vars[epsi_start + t];
 
-      fg[0] += cte * cte;
-      fg[0] += epsi * epsi;
-      fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
+      fg[0] += .5 * cte * cte;
+      fg[0] += 16 * epsi * epsi;
+      fg[0] += .5 * CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += .5 * CppAD::pow(vars[delta_start + t], 2);
       //fg[0] += CppAD::pow(vars[a_start + t], 2);
     }
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 2 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 4 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
       //fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
@@ -103,10 +121,22 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0;
-      AD<double> f1 = coeffs[0] + coeffs[1] * x1 + coeffs[2] * x1 * x1;
-      AD<double> psides0 = CppAD::atan(2. * coeffs[2] * x0 + coeffs[1]);
-      AD<double> psides1 = CppAD::atan(2. * coeffs[2] * x1 + coeffs[1]);
+      // Second
+      //AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0;
+      //AD<double> f1 = coeffs[0] + coeffs[1] * x1 + coeffs[2] * x1 * x1;
+      //AD<double> psides0 = CppAD::atan(2. * coeffs[2] * x0 + coeffs[1]);
+      //AD<double> psides1 = CppAD::atan(2. * coeffs[2] * x1 + coeffs[1]);
+      // Third
+      AD<double> f0 = coeffs[0] + coeffs[1]*x0 + coeffs[2]*x0*x0 + coeffs[3]*x0*x0*x0;
+      AD<double> f1 = coeffs[0] + coeffs[1]*x1 + coeffs[2]*x1*x1 + coeffs[3]*x1*x1*x1;
+      AD<double> psides0 = CppAD::atan(3.*coeffs[3]*x0*x0 + 2. * coeffs[2]*x0 + coeffs[1]);
+      AD<double> psides1 = CppAD::atan(3.*coeffs[3]*x1*x1 + 2. * coeffs[2]*x1 + coeffs[1]);
+
+      //AD<double> f0 = polyeval(coeffs, Value(x0));
+      //AD<double> f1 = polyeval(coeffs, Value(x1));
+      //AD<double> psides0 = CppAD::atan(polyderiv(coeffs, Value(x0)));
+      //AD<double> psides1 = CppAD::atan(polyderiv(coeffs, Value(x1)));
+
       //AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0;
       //AD<double> psides0 = CppAD::atan(coeffs[1] + 2. * coeffs[2] * x0);
       // Here's `x` to get you started.
@@ -251,15 +281,7 @@ vector<vector<double>> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   auto cost = solution.obj_value;
   std::cout << "Cost " << cost << " Ok " << ok << std::endl;
 
-  // TODO: Return the first actuator values. The variables can be accessed with
-  // `solution.x[i]`.
-  //
-  // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
-  // creates a 2 element double vector.
-  //return {solution.x[x_start + 1],   solution.x[y_start + 1],
-  //        solution.x[psi_start + 1], solution.x[v_start + 1],
-  //        solution.x[cte_start + 1], solution.x[epsi_start + 1],
-  //        solution.x[delta_start],   solution.x[a_start]};
+  // Return the predicted trajectory and control values.
   vector<vector<double>> ret;
   vector<double> vx;
   for(int i = x_start; i < y_start; ++i)

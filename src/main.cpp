@@ -35,15 +35,6 @@ string hasData(string s) {
   return "";
 }
 
-// Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
-  }
-  return result;
-}
-
 // Fit a polynomial.
 // Adapted from
 // https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
@@ -97,9 +88,6 @@ int main() {
 
           toCarCoord(ptsx, ptsy, px, py, psi);
 
-          //plt::plot(ptsx, ptsy);
-          //plt::show();
-
           int vsize = ptsx.size();
           Eigen::VectorXd vptsx(vsize);
           Eigen::VectorXd vptsy(vsize);
@@ -108,10 +96,9 @@ int main() {
             vptsy[i] = ptsy[i];
           }
 
-          auto coeffs = polyfit(vptsx, vptsy, 2);
-
-          double epsi = psi - atan(2. * coeffs[2] * px + coeffs[1]);
-          //auto coeffs = polyfit(vptsx, vptsy, 3);
+          int polyOrder = 3;
+          auto coeffs = polyfit(vptsx, vptsy, polyOrder);
+          double epsi = psi - atan(polyderiv(coeffs, px));
           //double epsi = psi - atan(2. * coeffs[2] * px + coeffs[1]);
           double cte = py - polyeval(coeffs, px);
           Eigen::VectorXd state(6);
@@ -136,11 +123,7 @@ int main() {
           msgJson["throttle"] = throttle_value;
 
 
-
-
           //Display the MPC predicted trajectory 
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-          // the points in the simulator are connected by a Green line
           vector<double> mpc_x_vals;
           vector<double> mpc_y_vals;
           for(int i = 0; i < vars[0].size(); ++i) {
@@ -151,10 +134,7 @@ int main() {
           msgJson["mpc_y"] = mpc_y_vals;
 
 
-
           //Display the waypoints/reference line
-          //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
-          // the points in the simulator are connected by a Yellow line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
           for(int i = 1; i < 30; ++i) {
