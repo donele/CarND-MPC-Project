@@ -9,7 +9,7 @@ using CppAD::AD;
 //size_t N = 10;
 //double dt = 0.1;
 size_t N = 5;
-double dt = 0.01;
+double dt = 0.1;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -51,17 +51,20 @@ class FG_eval {
     // TODO: Define the cost related the reference state and
     // any anything you think may be beneficial.
     for (int t = 0; t < N; t++) {
-      fg[0] += CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += CppAD::pow(vars[epsi_start + t], 2);
+      AD<double> cte = vars[cte_start + t];
+      AD<double> epsi = vars[epsi_start + t];
+
+      fg[0] += cte * cte;
+      fg[0] += epsi * epsi;
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
     for (int t = 0; t < N - 1; t++) {
       fg[0] += CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t], 2);
+      //fg[0] += CppAD::pow(vars[a_start + t], 2);
     }
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += 2 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      //fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
     //
@@ -100,6 +103,12 @@ class FG_eval {
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0;
+      AD<double> f1 = coeffs[0] + coeffs[1] * x1 + coeffs[2] * x1 * x1;
+      AD<double> psides0 = CppAD::atan(2. * coeffs[2] * x0 + coeffs[1]);
+      AD<double> psides1 = CppAD::atan(2. * coeffs[2] * x1 + coeffs[1]);
+      //AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0;
+      //AD<double> psides0 = CppAD::atan(coeffs[1] + 2. * coeffs[2] * x0);
       // Here's `x` to get you started.
       // The idea here is to constraint this value to be 0.
       //
@@ -112,9 +121,10 @@ class FG_eval {
       fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
       fg[1 + psi_start + t] = psi1 - (psi0 - v0 * delta0 * dt / Lf); // psi0 - v0 ...
       fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
-      //fg[1 + cte_start + t] = cte1 - (y1 + 1);
-      fg[1 + cte_start + t] = cte1 - (cte0 + (v0 * CppAD::sin(epsi0) * dt));
-      fg[1 + epsi_start + t] = epsi1 - (epsi0 - v0 * delta0 * dt / Lf); // epsi0 - v0 ...
+      //fg[1 + cte_start + t] = cte1 - (cte0 + (v0 * CppAD::sin(epsi0) * dt));
+      //fg[1 + epsi_start + t] = epsi1 - (epsi0 - v0 * delta0 * dt / Lf); // epsi0 - v0 ...
+      fg[1 + cte_start + t] = cte1 - (y0 + (v0 * CppAD::sin(epsi0) * dt) - f1);
+      fg[1 + epsi_start + t] = epsi1 - (psi0 - v0 * delta0 * dt / Lf - psides1); // epsi0 - v0 ...
     }
   }
 };
@@ -125,7 +135,7 @@ class FG_eval {
 MPC::MPC() {}
 MPC::~MPC() {}
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
+vector<vector<double>> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   bool ok = true;
   size_t i;
   typedef CPPAD_TESTVECTOR(double) Dvector;
@@ -224,7 +234,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   options += "Sparse  true        reverse\n";
   // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
   // Change this as you see fit.
-  options += "Numeric max_cpu_time          0.5\n";
+  options += "Numeric max_cpu_time          1\n";
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;
@@ -239,15 +249,27 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
+  std::cout << "Cost " << cost << " Ok " << ok << std::endl;
 
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
   //
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
-  return {solution.x[x_start + 1],   solution.x[y_start + 1],
-          solution.x[psi_start + 1], solution.x[v_start + 1],
-          solution.x[cte_start + 1], solution.x[epsi_start + 1],
-          solution.x[delta_start],   solution.x[a_start]};
+  //return {solution.x[x_start + 1],   solution.x[y_start + 1],
+  //        solution.x[psi_start + 1], solution.x[v_start + 1],
+  //        solution.x[cte_start + 1], solution.x[epsi_start + 1],
+  //        solution.x[delta_start],   solution.x[a_start]};
+  vector<vector<double>> ret;
+  vector<double> vx;
+  for(int i = x_start; i < y_start; ++i)
+    vx.push_back(solution.x[i]);
+  vector<double> vy;
+  for(int i = y_start; i < psi_start; ++i)
+    vy.push_back(solution.x[i]);
+  ret.push_back(vx);
+  ret.push_back(vy);
+  ret.push_back({solution.x[delta_start]});
+  ret.push_back({solution.x[a_start]});
+  return ret;
 }
