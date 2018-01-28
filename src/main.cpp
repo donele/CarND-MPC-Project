@@ -99,7 +99,6 @@ int main() {
           int polyOrder = 3;
           auto coeffs = polyfit(vptsx, vptsy, polyOrder);
           double epsi = psi - atan(polyderiv(coeffs, px));
-          //double epsi = psi - atan(2. * coeffs[2] * px + coeffs[1]);
           double cte = py - polyeval(coeffs, px);
           Eigen::VectorXd state(6);
           state << px, py, psi, v, cte, epsi;
