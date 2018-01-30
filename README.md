@@ -1,7 +1,66 @@
-# CarND-Controls-MPC
+# Model Predictive Control
 Self-Driving Car Engineer Nanodegree Program
 
+A Model Predictive Control (MPC) is implemented in C++ to control a vehicle along a track.
+At each time step, the simulator provides the waypoints that can be fitted with a polynomial.
+Then a future trajectory is calculated by minimizing an error function, and the control parameters are sent back to the simulator.
+The vehicle is modeled by six paraterers that include cross track error and the error in psi, and is controled by the steering and actuation.
+The effect of latency is considered.
+
 ---
+
+## Vehicle Model
+
+The state of the vehicle is modeled by six parameters; x position (`x`), y position (`y`), yaw angle (`psi`), speed (`v`), cross track error (`CTE`), and the error in psi (`epsi`).
+The state variables evolves in time step dt as following:
+
+- x(t+1) = x(t) + v(t) * cos(psi(t)) * dt
+- y(t+1) = y(t) + v(t) * sin(psi(t)) * dt
+- psi(t+1) = psi(t) + v(t) * delta(t) * / Lf * dt
+- v(t+1) = v(t) + a(t) * dt
+- cte(t+1) = f(x(t)) - y(t) + v(t) * sin(epsi(t)) * dt
+- epsi(t+1) = psi(t) - psides(t) + v(t) * delta(t) / Lf * dt
+
+`Lf` is the distance between the center of mass of the vehicle and the fron axle.
+The steering angle `delta` is limited within +/- 25 degrees.
+
+## Timestep
+
+The timestep `dt` for the trajectory calculation is chosen to be 0.1 second.
+If `dt` is too large, the calculation error may increase. If it was too short, the trajectory calculation may take too long.
+Assuming the speed of 30 mph, a vehicle will proceed about 5 meters in 0.1 second.
+That is about the length of a vehicle, and if the trajectory is sufficiently stable, one can assume that the motion of the vehicle would not be too complicated to cause excessive error in the calculation while moving that distance.
+
+The number of timesteps `N` is set to 15. The number should be large enough for a predictive control to take the relevant future information into account.
+However, it it was too long, resources may be wasted for unnecessary calculations.
+I chose the number so that the prediction, shown in green line in the simulator, covers the whole range of the steepest curve in the simulator.
+
+## Polynomial Fitting on Waypoints
+
+The simulator provides a set of x, y corrdinates along the track.
+The points are fitted to a third degree polynomial which is used to guide the vehicle.
+In order to be used for visualization, the points are transformed to the vehicle coordinate system from the map coordinate system by the function `toCarCoord()`.
+In the simulator, the fitted line is shwon in yellow.
+
+## State Error
+
+
+## Latency
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Dependencies
 
@@ -37,6 +96,31 @@ Self-Driving Car Engineer Nanodegree Program
 2. Make a build directory: `mkdir build && cd build`
 3. Compile: `cmake .. && make`
 4. Run it: `./mpc`.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Tips
 
