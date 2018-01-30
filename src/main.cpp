@@ -18,6 +18,9 @@ using json = nlohmann::json;
 constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
+double last_steer(double val = 0.);
+void update_err(double cte, double epsi, double steer, double dsteer);
+void applyLatency(double& px, double& py, double& psi, double v, double latency_ms, double steer);
 void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& py, double& psi);
 
 // Checks if the SocketIO event has JSON data.
@@ -60,6 +63,7 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 }
 
 int main() {
+  const int latency_ms = 100;
   uWS::Hub h;
 
   // MPC is initialized here!
@@ -70,6 +74,7 @@ int main() {
     // "42" at the start of the message means there's a websocket message event.
     // The 4 signifies a websocket message
     // The 2 signifies a websocket event
+    bool debug = true;
     string sdata = string(data).substr(0, length);
     cout << sdata << endl;
     if (sdata.size() > 2 && sdata[0] == '4' && sdata[1] == '2') {
@@ -87,6 +92,7 @@ int main() {
           double v = j[1]["speed"];
 
           toCarCoord(ptsx, ptsy, px, py, psi);
+          applyLatency(px, py, psi, v, latency_ms, last_steer());
 
           int vsize = ptsx.size();
           Eigen::VectorXd vptsx(vsize);
@@ -114,11 +120,15 @@ int main() {
           double steer_value = vars[2][0];
           double throttle_value = vars[3][0];
 
+          if(debug)
+            update_err(cte, epsi, steer_value, steer_value - last_steer());
+
+          last_steer(steer_value);
 
           json msgJson;
           // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
           // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-          msgJson["steering_angle"] = steer_value;
+          msgJson["steering_angle"] = steer_value / deg2rad(25);
           msgJson["throttle"] = throttle_value;
 
 
@@ -150,13 +160,7 @@ int main() {
           // Latency
           // The purpose is to mimic real driving conditions where
           // the car does actuate the commands instantly.
-          //
-          // Feel free to play around with this value but should be to drive
-          // around the track with 100ms latency.
-          //
-          // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
-          // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(latency_ms));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {
@@ -201,6 +205,21 @@ int main() {
   h.run();
 }
 
+double last_steer(double val) {
+  static double last_steer_ = 0.;
+  if(val !=  0.)
+    last_steer_ = val;
+  return last_steer_;
+}
+
+void applyLatency(double& px, double& py, double& psi, double v, double latency_ms, double steer) {
+  const double Lf = 2.67;
+  double dt = latency_ms / 1000.;
+  px += v * cos(psi) * dt;
+  py += v * sin(psi) * dt;
+  psi -= v / Lf * steer * dt;
+}
+
 void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& py, double& psi) {
   vector<double> carx;
   vector<double> cary;
@@ -218,4 +237,24 @@ void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& 
   px = 0.;
   py = 0.;
   psi = 0.;
+}
+
+void update_err(double cte, double epsi, double steer, double dsteer) {
+  static double sum_cte_sq = 0.;
+  static double sum_epsi_sq = 0.;
+  static double sum_steer_sq = 0.;
+  static double sum_dsteer_sq = 0.;
+  static int n = 0;
+  sum_cte_sq += cte * cte;
+  sum_epsi_sq += epsi * epsi;
+  sum_steer_sq += steer * steer;
+  sum_dsteer_sq += dsteer * dsteer;
+  ++n;
+  const int maxn = 400;
+  if(n > maxn) {
+    printf("avg cte %.4f avg epsi %.4f avg steer %.4f avg dsteer %.4f (n=%d)\n",
+        sqrt(sum_cte_sq/n), sqrt(sum_epsi_sq/n), sqrt(sum_steer_sq/n), sqrt(sum_dsteer_sq/n), maxn);
+    cout.flush();
+    exit(0);
+  }
 }
