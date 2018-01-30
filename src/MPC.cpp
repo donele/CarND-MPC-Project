@@ -41,9 +41,10 @@ AD<double> polyderiv(Eigen::VectorXd coeffs, AD<double> x) {
   return result;
 }
 
-const double ref_v = 30.;
+const double ref_v = 60.;
 size_t N = 15;
 double dt = 0.1;
+double extra_weight = 500.;
 
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
@@ -72,22 +73,17 @@ class FG_eval {
     fg[0] = 0;
 
     // Reference State Cost
-    // TODO: Define the cost related the reference state and
-    // any anything you think may be beneficial.
     for (int t = 0; t < N; t++) {
-      AD<double> cte = vars[cte_start + t];
-      AD<double> epsi = vars[epsi_start + t];
-
-      fg[0] += cte * cte;
-      fg[0] += 100 * epsi * epsi;
+      fg[0] += CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += CppAD::pow(vars[epsi_start + t], 2) * extra_weight;
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 10 * CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += CppAD::pow(vars[delta_start + t], 2) * extra_weight;
       fg[0] += CppAD::pow(vars[a_start + t], 2);
     }
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 20 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2) * extra_weight;
       fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
@@ -169,12 +165,7 @@ vector<vector<double>> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
   double epsi = state[5];
 
   // TODO: Set the number of model variables (includes both states and inputs).
-  // For example: If the state is a 4 element vector, the actuators is a 2
-  // element vector and there are 10 timesteps. The number of variables is:
-  //
-  // 4 * 10 + 2 * 9
   size_t n_vars = N * 6 + (N - 1) * 2;
-  // TODO: Set the number of constraints
   size_t n_constraints = N * 6;
 
   // Initial value of the independent variables.
