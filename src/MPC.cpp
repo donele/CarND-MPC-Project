@@ -41,7 +41,7 @@ AD<double> polyderiv(Eigen::VectorXd coeffs, AD<double> x) {
   return result;
 }
 
-const double ref_v = 60.;
+const double ref_v = 50.;
 size_t N = 15;
 double dt = 0.1;
 double extra_weight = 500.;
