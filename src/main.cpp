@@ -7,60 +7,13 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
+#include "Tools.h"
 #include "json.hpp"
 #include "matplotlibcpp.h"
 namespace plt = matplotlibcpp;
 
 // for convenience
 using json = nlohmann::json;
-
-// For converting back and forth between radians and degrees.
-constexpr double pi() { return M_PI; }
-double deg2rad(double x) { return x * pi() / 180; }
-double rad2deg(double x) { return x * 180 / pi(); }
-double last_steer(double val = 0.);
-void update_err(double cte, double epsi, double steer, double dsteer);
-void applyLatency(double& px, double& py, double& psi, double v, double latency_ms, double steer);
-void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& py, double& psi);
-
-// Checks if the SocketIO event has JSON data.
-// If there is data the JSON object in string format will be returned,
-// else the empty string "" will be returned.
-string hasData(string s) {
-  auto found_null = s.find("null");
-  auto b1 = s.find_first_of("[");
-  auto b2 = s.rfind("}]");
-  if (found_null != string::npos) {
-    return "";
-  } else if (b1 != string::npos && b2 != string::npos) {
-    return s.substr(b1, b2 - b1 + 2);
-  }
-  return "";
-}
-
-// Fit a polynomial.
-// Adapted from
-// https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
-Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
-                        int order) {
-  assert(xvals.size() == yvals.size());
-  assert(order >= 1 && order <= xvals.size() - 1);
-  Eigen::MatrixXd A(xvals.size(), order + 1);
-
-  for (int i = 0; i < xvals.size(); i++) {
-    A(i, 0) = 1.0;
-  }
-
-  for (int j = 0; j < xvals.size(); j++) {
-    for (int i = 0; i < order; i++) {
-      A(j, i + 1) = A(j, i) * xvals(j);
-    }
-  }
-
-  auto Q = A.householderQr();
-  auto result = Q.solve(yvals);
-  return result;
-}
 
 int main() {
   const int latency_ms = 100;
@@ -203,58 +156,4 @@ int main() {
     return -1;
   }
   h.run();
-}
-
-double last_steer(double val) {
-  static double last_steer_ = 0.;
-  if(val !=  0.)
-    last_steer_ = val;
-  return last_steer_;
-}
-
-void applyLatency(double& px, double& py, double& psi, double v, double latency_ms, double steer) {
-  const double Lf = 2.67;
-  double dt = latency_ms / 1000.;
-  px += v * cos(psi) * dt;
-  py += v * sin(psi) * dt;
-  psi -= v / Lf * steer * dt;
-}
-
-void toCarCoord(vector<double>& ptsx, vector<double>& ptsy, double& px, double& py, double& psi) {
-  vector<double> carx;
-  vector<double> cary;
-
-  int n = ptsx.size();
-  for(int i = 0; i < n; ++i) {
-    double x = cos(-psi) * (ptsx[i] - px) - sin(-psi) * (ptsy[i] - py);
-    double y = sin(-psi) * (ptsx[i] - px) + cos(-psi) * (ptsy[i] - py);
-    carx.push_back(x);
-    cary.push_back(y);
-  }
-
-  ptsx = carx;
-  ptsy = cary;
-  px = 0.;
-  py = 0.;
-  psi = 0.;
-}
-
-void update_err(double cte, double epsi, double steer, double dsteer) {
-  static double sum_cte_sq = 0.;
-  static double sum_epsi_sq = 0.;
-  static double sum_steer_sq = 0.;
-  static double sum_dsteer_sq = 0.;
-  static int n = 0;
-  sum_cte_sq += cte * cte;
-  sum_epsi_sq += epsi * epsi;
-  sum_steer_sq += steer * steer;
-  sum_dsteer_sq += dsteer * dsteer;
-  ++n;
-  const int maxn = 400;
-  if(n > maxn) {
-    printf("avg cte %.4f avg epsi %.4f avg steer %.4f avg dsteer %.4f (n=%d)\n",
-        sqrt(sum_cte_sq/n), sqrt(sum_epsi_sq/n), sqrt(sum_steer_sq/n), sqrt(sum_dsteer_sq/n), maxn);
-    cout.flush();
-    exit(0);
-  }
 }

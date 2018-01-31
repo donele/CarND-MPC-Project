@@ -1,45 +1,10 @@
 #include "MPC.h"
+#include "Tools.h"
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
 #include "Eigen-3.3/Eigen/Core"
 
 using CppAD::AD;
-
-// Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * pow(x, i);
-  }
-  return result;
-}
-
-// Evaluate a derivative.
-double polyderiv(Eigen::VectorXd coeffs, double x) {
-  double result = 0.0;
-  for (int i = 1; i < coeffs.size(); i++) {
-    result += i * coeffs[i] * pow(x, i - 1);
-  }
-  return result;
-}
-
-// Evaluate a polynomial.
-AD<double> polyeval(Eigen::VectorXd coeffs, AD<double> x) {
-  AD<double> result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
-    result += coeffs[i] * CppAD::pow(x, i);
-  }
-  return result;
-}
-
-// Evaluate a derivative.
-AD<double> polyderiv(Eigen::VectorXd coeffs, AD<double> x) {
-  AD<double> result = 0.0;
-  for (int i = 1; i < coeffs.size(); i++) {
-    result += i * coeffs[i] * CppAD::pow(x, i - 1);
-  }
-  return result;
-}
 
 const double ref_v = 50.;
 size_t N = 15;

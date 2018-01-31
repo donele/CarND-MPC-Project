@@ -6,9 +6,6 @@
 
 using namespace std;
 
-double polyeval(Eigen::VectorXd coeffs, double x);
-double polyderiv(Eigen::VectorXd coeffs, double x);
-
 class MPC {
  public:
   MPC();
