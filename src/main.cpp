@@ -17,6 +17,7 @@ using json = nlohmann::json;
 
 int main() {
   const int latency_ms = 100;
+  const int polyOrder = 3;
   uWS::Hub h;
 
   // MPC is initialized here!
@@ -55,7 +56,6 @@ int main() {
             vptsy[i] = ptsy[i];
           }
 
-          int polyOrder = 3;
           auto coeffs = polyfit(vptsx, vptsy, polyOrder);
           double epsi = psi - atan(polyderiv(coeffs, px));
           double cte = py - polyeval(coeffs, px);
