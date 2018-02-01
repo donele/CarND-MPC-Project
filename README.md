@@ -29,21 +29,74 @@ The steering angle `delta` is limited within +/- 25 degrees.
 The timestep `dt` for the trajectory calculation is chosen to be 0.1 second.
 If `dt` is too large, the calculation error may increase. If it was too short, the trajectory calculation may take too long.
 Assuming the speed of 30 mph, a vehicle will proceed about 5 meters in 0.1 second.
-That is about the length of a vehicle, and if the trajectory is sufficiently stable, one can assume that the motion of the vehicle would not be too complicated to cause excessive error in the calculation while moving that distance.
+That is about the length of a vehicle, and if the trajectory is sufficiently stable, one can assume that the motion of the vehicle would not be too complicated to cause an excessive error in the calculation while moving that distance.
 
 The number of timesteps `N` is set to 15. The number should be large enough for a predictive control to take the relevant future information into account.
 However, it it was too long, resources may be wasted for unnecessary calculations.
 I chose the number so that the prediction, shown in green line in the simulator, covers the whole range of the steepest curve in the simulator.
 
-## Polynomial Fitting on Waypoints
+## Fitting on Waypoints
 
 The simulator provides a set of x, y corrdinates along the track.
 The points are fitted to a third degree polynomial which is used to guide the vehicle.
 In order to be used for visualization, the points are transformed to the vehicle coordinate system from the map coordinate system by the function `toCarCoord()`.
 In the simulator, the fitted line is shwon in yellow.
 
-## State Error
+## Trajectory Optimization
 
+The trajectory is calculated by minimizing the cost function as defined in `FG_eval::operator()`.
+
+```c++
+    // Reference State Cost
+    for (int t = 0; t < N; t++) {
+      fg[0] += CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += CppAD::pow(vars[epsi_start + t], 2) * extra_weight;
+      fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
+    }
+    for (int t = 0; t < N - 1; t++) {
+      fg[0] += CppAD::pow(vars[delta_start + t], 2) * extra_weight;
+      fg[0] += CppAD::pow(vars[a_start + t], 2);
+    }
+    for (int t = 0; t < N - 2; t++) {
+      fg[0] += CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2) * extra_weight;
+      fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+    }
+```
+
+First three terms are to minimize the squared sum of CTE, epsi, and the speed difference from the reference speed.
+Next two terms control the magnitudes of steering angle and actuation.
+Final two tems are intended to avoid aprupt changes in steering and actuation.
+With equal weights on each terms, the simulation showed a lot of zigzagging in the trajectory.
+Therfore I applied `extra_weight` on the terms that regulate the errors of calculated from angular components; epsi, and steering angle.
+In order to decide on the value of the extra weight, I RMSE of CTE, epsi, steering, and the steerig increment at each timestep, with the weigt set to different values.
+The test is done with the first 400 calculations and `ref_v` set to 30.
+The result is shown in the next table and I chose 500 that seems to minimize most errors.
+
+| extra weight | RMSE(CTE) | RMSE(epsi) | RMSE(delta) | RMSE(d_delta) |
+|:------------:|:---------:|:----------:|:-----------:|:-------------:|
+| 10           | fails |
+| 100          | 
+| 200          | 
+| 500          | 
+| 1000         | 
+| 2000         | 
+
+Using the same test, I 
+
+| N  | RMSE(CTE) | RMSE(epsi) | RMSE(delta) | RMSE(d_delta) |
+|:--:|:---------:|:----------:|:-----------:|:-------------:|
+| 12 | 0.3578 | 0.0192 | 0.0292 | 0.0084 |
+| 15 | 0.2721 | 0.0211 | 0.0300 | 0.0094 |
+| 18 | 0.2487 | 0.0245 | 0.0303 | 0.0108 |
+| 21 | 0.2502 | 0.0238 | 0.0361 | 0.0104 |
+
+And
+
+| Order  | RMSE(CTE) | RMSE(epsi) | RMSE(delta) | RMSE(d_delta) |
+|:------:|:---------:|:----------:|:-----------:|:-------------:|
+| 2 | 0.4030 | 0.0478 | 0.0327 | 0.0209 |
+| 3 | 0.2881 | 0.0201 | 0.0295 | 0.0090 |
+| 4 | 0.3853 | 0.0231 | 0.0296 | 0.0078 |
 
 ## Latency
 
