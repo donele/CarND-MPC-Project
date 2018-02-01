@@ -6,10 +6,10 @@
 
 using CppAD::AD;
 
-const double ref_v = 50.;
+const double ref_v = 30.;
 size_t N = 15;
 double dt = 0.1;
-double extra_weight = 500.;
+double extra_weight = 100.;
 
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
